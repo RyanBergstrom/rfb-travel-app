@@ -1,9 +1,13 @@
 import re
 
 CHF_TO_USD = 1.12
+EUR_TO_USD = 1.14
 
 def chf_to_usd(chf):
     return round(float(chf) * CHF_TO_USD, 2)
+
+def eur_to_usd(eur):
+    return round(float(eur) * EUR_TO_USD, 2)
 
 def parse_quantity(qty_str):
     if not qty_str:
@@ -47,8 +51,15 @@ def format_us_value(amount, unit):
 
 def convert_product(p):
     result = dict(p)
-    price_usd = chf_to_usd(p['price_chf'])
-    result['price_usd'] = price_usd
+    if p.get('price_eur') is not None:
+        price_usd = eur_to_usd(p['price_eur'])
+        result['price_usd'] = price_usd
+    else:
+        price_usd = chf_to_usd(p['price_chf'])
+        result['price_usd'] = price_usd
+
+    result['name_display'] = p.get('name_en') or p.get('name', '')
+    result['category_display'] = p.get('category_en') or p.get('category', '')
 
     if p.get('quantity'):
         amt, unit = parse_quantity(p['quantity'])
@@ -68,6 +79,15 @@ def convert_product(p):
         else:
             result['per_unit_us'] = p['per_unit']
         ppu = chf_to_usd(p['price_per_unit_chf'])
+        result['price_per_unit_usd'] = ppu
+    elif p.get('per_unit') and p.get('price_per_unit_eur'):
+        amt, unit = parse_quantity(p['per_unit'])
+        if amt and unit:
+            us_amt, us_unit = metric_to_us(amt, unit)
+            result['per_unit_us'] = format_us_value(us_amt, us_unit)
+        else:
+            result['per_unit_us'] = p['per_unit']
+        ppu = eur_to_usd(p['price_per_unit_eur'])
         result['price_per_unit_usd'] = ppu
     else:
         result['per_unit_us'] = None
