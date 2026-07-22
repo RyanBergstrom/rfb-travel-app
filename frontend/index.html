@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Travel Price Search</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #f5f5f5; color: #222; font-size: 14px; line-height: 1.4;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .header {
+    position: sticky; top: 0; z-index: 10;
+    background: #fff; padding: 12px 16px 8px;
+    border-bottom: 1px solid #e0e0e0;
+  }
+  .header h1 { font-size: 18px; font-weight: 600; margin-bottom: 8px; }
+  .search-row {
+    display: flex; gap: 8px;
+  }
+  .search-box {
+    flex: 1; padding: 10px 14px; font-size: 16px;
+    border: 1px solid #ccc; border-radius: 10px;
+    outline: none; background: #fff;
+  }
+  .search-box:focus { border-color: #007aff; }
+  .cat-select {
+    padding: 10px 8px; font-size: 14px;
+    border: 1px solid #ccc; border-radius: 10px;
+    outline: none; background: #fff; color: #222;
+    max-width: 140px;
+  }
+  .cat-select:focus { border-color: #007aff; }
+  .count-badge {
+    font-size: 12px; color: #888; padding: 4px 16px 0;
+  }
+  .product-list { padding: 8px 12px 80px; }
+  .product {
+    display: flex; gap: 12px; padding: 12px 0;
+    border-bottom: 1px solid #eee; align-items: flex-start;
+  }
+  .product-img {
+    width: 70px; height: 70px; border-radius: 8px;
+    background: #eee; flex-shrink: 0; object-fit: cover;
+  }
+  .product-info { flex: 1; min-width: 0; }
+  .product-name { font-weight: 500; font-size: 14px; margin-bottom: 4px; }
+  .product-meta { font-size: 12px; color: #888; margin-bottom: 4px; }
+  .product-price { font-weight: 600; font-size: 16px; color: #007aff; }
+  .product-unit-price { font-size: 11px; color: #999; }
+  .empty { text-align: center; padding: 40px 16px; color: #888; }
+  .loading { text-align: center; padding: 20px; color: #888; }
+  @media (prefers-color-scheme: dark) {
+    body { background: #1c1c1e; color: #f5f5f5; }
+    .header { background: #1c1c1e; border-color: #333; }
+    .search-box { background: #2c2c2e; border-color: #444; color: #f5f5f5; }
+    .search-box:focus { border-color: #0a84ff; }
+    .cat-select { background: #2c2c2e; border-color: #444; color: #f5f5f5; }
+    .cat-select:focus { border-color: #0a84ff; }
+    .product { border-color: #333; }
+    .product-meta, .empty, .loading, .count-badge, .product-unit-price { color: #888; }
+    .product-price { color: #0a84ff; }
+  }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>&#x1f30d; Travel Price Search</h1>
+  <div class="search-row">
+    <input class="search-box" type="search" id="search" placeholder="Search products..." autocomplete="off" autofocus>
+    <select class="cat-select" id="category">
+      <option value="">All</option>
+    </select>
+  </div>
+</div>
+<div class="count-badge" id="count"></div>
+<div class="product-list" id="results"></div>
+
+<script>
+const searchEl = document.getElementById('search');
+const catEl = document.getElementById('category');
+const resultsEl = document.getElementById('results');
+const countEl = document.getElementById('count');
+
+let debounceTimer;
+
+searchEl.addEventListener('input', () => {
+  clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(doSearch, 200);
+});
+catEl.addEventListener('change', doSearch);
+
+async function loadCategories() {
+  try {
+    const res = await fetch('/api/categories');
+    const cats = await res.json();
+    let html = '<option value="">All</option>';
+    for (const c of cats) {
+      const label = c.category.replace(/-/g, ' ');
+      html += '<option value="' + escapeHtml(c.category) + '">' + escapeHtml(label) + ' (' + c.count + ')</option>';
+    }
+    catEl.innerHTML = html;
+  } catch (e) {}
+}
+
+async function doSearch() {
+  const q = searchEl.value.trim();
+  const cat = catEl.value;
+  resultsEl.innerHTML = '<div class="loading">Searching...</div>';
+  try {
+    let url = '/api/search?limit=50';
+    if (q) url += '&q=' + encodeURIComponent(q);
+    if (cat) url += '&cat=' + encodeURIComponent(cat);
+    const res = await fetch(url);
+    const products = await res.json();
+    render(products);
+  } catch (e) {
+    resultsEl.innerHTML = '<div class="empty">Connection error. Is the server running?</div>';
+  }
+}
+
+function render(products) {
+  if (!products.length) {
+    resultsEl.innerHTML = '<div class="empty">No products found</div>';
+    countEl.textContent = '';
+    return;
+  }
+  countEl.textContent = products.length + ' products';
+  let html = '';
+  for (const p of products) {
+    const imgUrl = p.image_url ? p.image_url.replace(/^\/\//, 'https://') : '';
+    const name = p.name || 'Unknown';
+    const qty = p.quantity_us || '';
+    const priceUsd = '$' + p.price_usd.toFixed(2);
+    let unitPrice = '';
+    if (p.price_per_unit_usd && p.per_unit_us) {
+      unitPrice = '$' + p.price_per_unit_usd.toFixed(2) + ' / ' + p.per_unit_us;
+    }
+
+    html += '<div class="product">';
+    if (imgUrl) {
+      html += '<img class="product-img" src="' + imgUrl + '" alt="" loading="lazy">';
+    } else {
+      html += '<div class="product-img"></div>';
+    }
+    html += '<div class="product-info">';
+    html += '<div class="product-name">' + escapeHtml(name) + '</div>';
+    if (qty) html += '<div class="product-meta">' + escapeHtml(qty) + '</div>';
+    html += '<div class="product-price">' + priceUsd + '</div>';
+    if (unitPrice) html += '<div class="product-unit-price">' + escapeHtml(unitPrice) + '</div>';
+    html += '</div></div>';
+  }
+  resultsEl.innerHTML = html;
+}
+
+function escapeHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+loadCategories();
+doSearch();
+</script>
+</body>
+</html>
