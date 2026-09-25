@@ -12,6 +12,7 @@ venv/
 .vscode/
 *.egg-info/
 dist/
+!weather_planner/frontend/dist/
 build/
 .pytest_cache/
 .ruff_cache/

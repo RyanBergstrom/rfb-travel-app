@@ -2,15 +2,21 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'weather_planner'))
 
 import json
+import time
 import traceback
 
 from fastapi import FastAPI, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from database import init_db, search_products, get_all_products, product_count, get_categories, get_sources, get_connection
 from converter import convert_product
+
+WEATHER_CACHE_PATH = os.path.join(os.path.dirname(__file__), '..', 'weather_planner', 'backend', 'cache', 'forecast_cache.json')
+CACHE_TTL_SECONDS = 2 * 60 * 60  # 2 hours
 
 app = FastAPI(title="Travel Price Search")
 
@@ -22,6 +28,30 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+def _read_cache() -> dict | None:
+    if not os.path.exists(WEATHER_CACHE_PATH):
+        return None
+    try:
+        with open(WEATHER_CACHE_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
+def _write_cache(data: dict) -> None:
+    os.makedirs(os.path.dirname(WEATHER_CACHE_PATH), exist_ok=True)
+    with open(WEATHER_CACHE_PATH, "w", encoding="utf-8") as f:
+        json.dump(data, f)
+
+
+def _cache_is_valid() -> bool:
+    cached = _read_cache()
+    if not cached or "timestamp" not in cached:
+        return False
+    return (time.time() - cached["timestamp"]) < CACHE_TTL_SECONDS
+
 
 @app.on_event("startup")
 def startup():
@@ -96,6 +126,68 @@ def admin():
     admin_path = os.path.join(os.path.dirname(__file__), '..', 'frontend', 'sql.html')
     with open(admin_path, 'r', encoding='utf-8') as f:
         return f.read()
+
+@app.get("/weather", response_class=HTMLResponse)
+def weather_planner():
+    weather_path = os.path.join(os.path.dirname(__file__), '..', 'weather_planner', 'frontend', 'dist', 'index.html')
+    if os.path.exists(weather_path):
+        with open(weather_path, 'r', encoding='utf-8') as f:
+            return f.read()
+    dev_path = os.path.join(os.path.dirname(__file__), '..', 'weather_planner', 'frontend', 'index.html')
+    with open(dev_path, 'r', encoding='utf-8') as f:
+        return f.read()
+
+@app.get("/api/weather/locations")
+def weather_locations():
+    from backend.services.location_service import get_enabled_locations
+    return get_enabled_locations()
+
+
+async def _refresh_weather_cache() -> dict:
+    from backend.services.location_service import get_enabled_locations
+    from backend.services.weather_service import fetch_forecast_batch, aggregate_forecast
+    locations = get_enabled_locations()
+    raw_data = await fetch_forecast_batch(locations)
+    all_forecasts = []
+    success_count = 0
+    for loc in locations:
+        raw = raw_data.get(loc["id"])
+        if raw:
+            success_count += 1
+            all_forecasts.extend(aggregate_forecast(raw, loc["id"]))
+    cache_data = {
+        "timestamp": time.time(),
+        "forecasts": all_forecasts,
+        "locationCount": len(locations),
+        "locationsRefreshed": success_count,
+    }
+    _write_cache(cache_data)
+    return cache_data
+
+
+@app.get("/api/weather/forecast")
+async def weather_forecast(location_id: str = Query(None)):
+    cached = _read_cache()
+    if _cache_is_valid() and cached and "forecasts" in cached:
+        forecasts = cached["forecasts"]
+    else:
+        cache_data = await _refresh_weather_cache()
+        forecasts = cache_data["forecasts"]
+
+    if location_id:
+        forecasts = [f for f in forecasts if f["locationId"] == location_id]
+
+    return {"forecasts": forecasts, "locationCount": len(set(f["locationId"] for f in forecasts))}
+
+
+@app.post("/api/weather/refresh")
+async def weather_refresh():
+    cache_data = await _refresh_weather_cache()
+    return {
+        "status": "refreshed",
+        "locationsRefreshed": cache_data["locationsRefreshed"],
+        "totalLocations": cache_data["locationCount"],
+    }
 
 if __name__ == '__main__':
     import uvicorn
