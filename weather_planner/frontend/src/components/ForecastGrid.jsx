@@ -129,7 +129,7 @@ export default function ForecastGrid({ forecasts, locations, selectedId, onSelec
                     tabIndex={0}
                     aria-label={`${loc.name}, ${loc.region}`}
                   >
-                    <div className="loc-name">{loc.name}</div>
+                    <div className="loc-name">{loc.name.split(' ').map((w, i) => <div key={i}>{w}</div>)}</div>
                     <div className="loc-region">{loc.region}</div>
                   </div>
                 )}

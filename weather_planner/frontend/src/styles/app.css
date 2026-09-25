@@ -215,7 +215,7 @@ body {
   font-size: 12px;
   font-weight: 600;
   line-height: 1.2;
-  word-break: break-word;
+  text-align: center;
 }
 
 .loc-region {
