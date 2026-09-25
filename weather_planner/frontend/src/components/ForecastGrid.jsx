@@ -52,6 +52,7 @@ export default function ForecastGrid({ forecasts, locations, selectedId, onSelec
   }, [forecasts])
 
   const periods = ['Morning', 'Afternoon', 'Evening']
+  const periodIcons = { Morning: '🌅', Afternoon: '☀️', Evening: '🌇' }
 
   useEffect(() => {
     if (selectedId && locationRefs.current[selectedId]) {
@@ -90,7 +91,7 @@ export default function ForecastGrid({ forecasts, locations, selectedId, onSelec
       <div
         className="forecast-grid"
         style={{
-          gridTemplateColumns: `160px 90px repeat(${dates.length}, minmax(100px, 1fr))`,
+          gridTemplateColumns: `100px 36px repeat(${dates.length}, minmax(100px, 1fr))`,
         }}
         role="grid"
         aria-label="Weather forecast grid"
@@ -128,17 +129,15 @@ export default function ForecastGrid({ forecasts, locations, selectedId, onSelec
                     tabIndex={0}
                     aria-label={`${loc.name}, ${loc.region}`}
                   >
-                    <div>{loc.name}</div>
-                    <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>
-                      {loc.region}
-                    </div>
+                    <div className="loc-name">{loc.name}</div>
+                    <div className="loc-region">{loc.region}</div>
                   </div>
                 )}
                 <div
                   className={`grid-cell period-col ${isSelected ? 'selected' : ''}`}
                   role="rowheader"
                 >
-                  {period}
+                  <span title={period}>{periodIcons[period]}</span>
                 </div>
                 {dates.map(d => {
                   const data = periodData.find(f => f.date === d)
