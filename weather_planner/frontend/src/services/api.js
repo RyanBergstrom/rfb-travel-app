@@ -16,6 +16,21 @@ export async function fetchForecast(locationId) {
   return data
 }
 
+export function subscribeForecastStream(onBatch, onDone) {
+  const es = new EventSource('/api/weather/forecast/stream')
+  es.addEventListener('forecast', (e) => {
+    onBatch(JSON.parse(e.data))
+  })
+  es.addEventListener('done', (e) => {
+    onDone(JSON.parse(e.data))
+    es.close()
+  })
+  es.onerror = () => {
+    es.close()
+  }
+  return () => es.close()
+}
+
 export async function refreshWeather() {
   const { data } = await api.post('/refresh')
   return data

@@ -9,7 +9,7 @@ import traceback
 
 from fastapi import FastAPI, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from database import init_db, search_products, get_all_products, product_count, get_categories, get_sources, get_connection
 from converter import convert_product
@@ -131,6 +131,49 @@ async def weather_forecast(location_id: str = Query(None)):
         forecasts = [f for f in forecasts if f["locationId"] == location_id]
 
     return {"forecasts": forecasts, "locationCount": len(set(f["locationId"] for f in forecasts))}
+
+
+@app.get("/api/weather/forecast/stream")
+async def weather_forecast_stream():
+    from weather_fetcher import load_locations, read_cache, cache_is_valid, refresh_all, fetch_forecast_batch, aggregate_forecast, write_cache
+    import asyncio, json, time
+
+    cached = read_cache()
+    if cache_is_valid() and cached and "forecasts" in cached:
+        def send_cached():
+            yield f"event: forecast\ndata: {json.dumps({'forecasts': cached['forecasts'], 'locationCount': len(set(f['locationId'] for f in cached['forecasts'])), 'progress': 100, 'loaded': len(cached['forecasts']), 'total': len(cached['forecasts'])})}\n\n"
+            yield f"event: done\ndata: {{}}\n\n"
+        return StreamingResponse(send_cached(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+    locations = load_locations()
+    total = len(locations)
+    BATCH_SIZE = 5
+
+    async def event_generator():
+        all_forecasts = []
+        for i in range(0, total, BATCH_SIZE):
+            batch = locations[i:i + BATCH_SIZE]
+            raw_data = await fetch_forecast_batch(batch)
+            batch_forecasts = []
+            for loc in batch:
+                raw = raw_data.get(loc["id"])
+                if raw:
+                    batch_forecasts.extend(aggregate_forecast(raw, loc["id"]))
+            all_forecasts.extend(batch_forecasts)
+            loaded = min(i + BATCH_SIZE, total)
+            progress = int(loaded / total * 100)
+            yield f"event: forecast\ndata: {json.dumps({'forecasts': batch_forecasts, 'progress': progress, 'loaded': loaded, 'total': total, 'batchIndex': i // BATCH_SIZE})}\n\n"
+
+        cache_data = {
+            "timestamp": time.time(),
+            "forecasts": all_forecasts,
+            "locationCount": total,
+            "locationsRefreshed": sum(1 for f in all_forecasts if f),
+        }
+        write_cache(cache_data)
+        yield f"event: done\ndata: {json.dumps({'totalForecasts': len(all_forecasts)})}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 @app.post("/api/weather/refresh")
 async def weather_refresh():

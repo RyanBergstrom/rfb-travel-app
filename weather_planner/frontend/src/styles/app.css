@@ -352,6 +352,35 @@ body {
   text-align: center;
 }
 
+.stream-progress {
+  position: relative;
+  height: 24px;
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border);
+  overflow: hidden;
+}
+
+.progress-bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  background: var(--color-primary);
+  opacity: 0.2;
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
 /* Leaflet marker pulse animation */
 @keyframes pulse {
   0% { transform: scale(1); opacity: 1; }
