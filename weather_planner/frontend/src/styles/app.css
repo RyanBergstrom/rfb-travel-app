@@ -205,10 +205,12 @@ body {
   left: 0;
   z-index: 15;
   background: var(--color-surface);
-  min-width: 100px;
-  max-width: 100px;
+  min-width: 80px;
+  max-width: 80px;
   font-weight: 500;
-  padding: 4px 6px;
+  padding: 4px 2px;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .loc-name {
@@ -222,12 +224,12 @@ body {
   font-size: 10px;
   color: var(--color-text-secondary);
   line-height: 1.2;
-  word-break: break-word;
+  text-align: center;
 }
 
 .grid-cell.period-col {
   position: sticky;
-  left: 100px;
+  left: 80px;
   z-index: 10;
   background: var(--color-surface);
   min-width: 36px;
@@ -242,13 +244,13 @@ body {
   left: 0;
   z-index: 30;
   background: var(--color-surface);
-  min-width: 100px;
-  max-width: 100px;
+  min-width: 80px;
+  max-width: 80px;
 }
 
 .grid-cell.period-header {
   position: sticky;
-  left: 100px;
+  left: 80px;
   z-index: 30;
   background: var(--color-surface);
   min-width: 36px;

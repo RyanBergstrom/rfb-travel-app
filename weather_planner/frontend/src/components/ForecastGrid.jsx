@@ -91,7 +91,7 @@ export default function ForecastGrid({ forecasts, locations, selectedId, onSelec
       <div
         className="forecast-grid"
         style={{
-          gridTemplateColumns: `100px 36px repeat(${dates.length}, minmax(100px, 1fr))`,
+          gridTemplateColumns: `80px 36px repeat(${dates.length}, minmax(100px, 1fr))`,
         }}
         role="grid"
         aria-label="Weather forecast grid"
