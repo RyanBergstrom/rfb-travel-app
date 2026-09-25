@@ -2,7 +2,7 @@ import axios from 'axios'
 
 const api = axios.create({
   baseURL: '/api/weather',
-  timeout: 30000,
+  timeout: 120000,
 })
 
 export async function fetchLocations() {
@@ -12,23 +12,8 @@ export async function fetchLocations() {
 
 export async function fetchForecast(locationId) {
   const params = locationId ? { location_id: locationId } : {}
-  const { data } = await api.get('/forecast', { params })
+  const { data } = await api.get('/forecast', { params, timeout: 120000 })
   return data
-}
-
-export function subscribeForecastStream(onBatch, onDone) {
-  const es = new EventSource('/api/weather/forecast/stream')
-  es.addEventListener('forecast', (e) => {
-    onBatch(JSON.parse(e.data))
-  })
-  es.addEventListener('done', (e) => {
-    onDone(JSON.parse(e.data))
-    es.close()
-  })
-  es.onerror = () => {
-    es.close()
-  }
-  return () => es.close()
 }
 
 export async function refreshWeather() {
