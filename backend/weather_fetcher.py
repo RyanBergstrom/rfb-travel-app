@@ -169,16 +169,32 @@ def aggregate_forecast(raw_forecast, location_id):
     return results
 
 
-async def refresh_all():
+async def refresh_all(force=False):
     locations = load_locations()
     raw_data = await fetch_forecast_batch(locations)
     all_forecasts = []
     success_count = 0
+    failed_ids = []
     for loc in locations:
         raw = raw_data.get(loc["id"])
         if raw:
             success_count += 1
             all_forecasts.extend(aggregate_forecast(raw, loc["id"]))
+        else:
+            failed_ids.append(loc["id"])
+
+    if failed_ids and not force:
+        cached = read_cache()
+        if cached and "forecasts" in cached:
+            existing_ids = set(f["locationId"] for f in cached["forecasts"])
+            for f in all_forecasts:
+                if f["locationId"] not in existing_ids:
+                    cached["forecasts"].append(f)
+            cached["locationsRefreshed"] = success_count
+            cached["timestamp"] = time.time()
+            write_cache(cached)
+            return cached
+
     cache_data = {
         "timestamp": time.time(),
         "forecasts": all_forecasts,
