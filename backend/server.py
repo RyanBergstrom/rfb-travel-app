@@ -127,6 +127,10 @@ def admin():
     with open(admin_path, 'r', encoding='utf-8') as f:
         return f.read()
 
+weather_dist = os.path.join(os.path.dirname(__file__), '..', 'weather_planner', 'frontend', 'dist')
+if os.path.isdir(weather_dist):
+    app.mount("/assets", StaticFiles(directory=os.path.join(weather_dist, "assets")), name="weather-assets")
+
 @app.get("/weather", response_class=HTMLResponse)
 def weather_planner():
     weather_path = os.path.join(os.path.dirname(__file__), '..', 'weather_planner', 'frontend', 'dist', 'index.html')
