@@ -427,5 +427,60 @@
     "priority": 3,
     "enabled": true,
     "tags": ["city", "castle"]
+  },
+  {
+    "id": "lochnagar",
+    "name": "Lochnagar",
+    "description": "Dramatic corrie and mountain summit",
+    "region": "Aberdeenshire",
+    "latitude": 56.963,
+    "longitude": -3.223,
+    "priority": 2,
+    "enabled": true,
+    "tags": ["hike", "mountain"]
+  },
+  {
+    "id": "clachnaben",
+    "name": "Clachnaben",
+    "description": "Moorland hill walk with a striking granite tors summit",
+    "region": "Aberdeenshire",
+    "latitude": 57.016,
+    "longitude": -2.618,
+    "priority": 2,
+    "enabled": true,
+    "tags": ["hike", "hill"]
+  },
+  {
+    "id": " Bennachie",
+    "name": "Bennachie",
+    "description": "Distinctive multi-peak hill range with panoramic views",
+    "region": "Aberdeenshire",
+    "latitude": 57.297,
+    "longitude": -2.571,
+    "priority": 2,
+    "enabled": true,
+    "tags": ["hike", "hill"]
+  },
+  {
+    "id": "cairn-table",
+    "name": "Cairn Table",
+    "description": "Historic hill walk with sweeping views south of Glasgow",
+    "region": "South Ayrshire",
+    "latitude": 55.485,
+    "longitude": -3.985,
+    "priority": 2,
+    "enabled": true,
+    "tags": ["hike", "hill"]
+  },
+  {
+    "id": "merkins-tether",
+    "name": "Culter Fell",
+    "description": "Highest summit in South Lanarkshire",
+    "region": "Southern Uplands",
+    "latitude": 55.539,
+    "longitude": -3.585,
+    "priority": 2,
+    "enabled": true,
+    "tags": ["hike", "mountain"]
   }
 ]
