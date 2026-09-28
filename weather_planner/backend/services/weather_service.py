@@ -117,6 +117,7 @@ def aggregate_period(
     }
 
 
+
 def aggregate_forecast(
     raw_forecast: dict, location_id: str
 ) -> List[dict]:
@@ -127,7 +128,11 @@ def aggregate_forecast(
     times = hourly.get("time", [])
 
     dates = sorted(set(t.split("T")[0] for t in times))
-    dates = dates[:7]
+    
+    # Get today's date and start from there
+    today = datetime.now().strftime("%Y-%m-%d")
+    start_idx = dates.index(today) if today in dates else 0
+    dates = dates[start_idx:start_idx+7]
 
     results = []
     for date_str in dates:
