@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 import time
+from datetime import date
 
 import httpx
 
@@ -159,7 +160,10 @@ def aggregate_forecast(raw_forecast, location_id):
         return []
     hourly = raw_forecast["hourly"]
     times = hourly.get("time", [])
-    dates = sorted(set(t.split("T")[0] for t in times))[:7]
+    
+    today_str = date.today().isoformat()
+    dates = sorted(set(t.split("T")[0] for t in times if t.split("T")[0] >= today_str))[:7]
+    
     results = []
     for date_str in dates:
         for period_name in ["Morning", "Afternoon", "Evening"]:
@@ -203,3 +207,4 @@ async def refresh_all(force=False):
     }
     write_cache(cache_data)
     return cache_data
+    
