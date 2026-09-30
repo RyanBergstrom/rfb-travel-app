@@ -13,7 +13,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from database import init_db, search_products, get_all_products, product_count, get_categories, get_sources, get_connection
 from converter import convert_product
-from weather_fetcher import load_locations, read_cache, write_cache, cache_is_valid, refresh_all
+from weather_fetcher import load_locations, read_cache, write_cache, cache_is_valid, refresh_all, aggregate_forecast
 
 app = FastAPI(title="Travel Price Search")
 
@@ -125,12 +125,25 @@ async def weather_forecast(location_id: str = Query(None)):
     has_cache = cached and "forecasts" in cached
     cache_valid = cache_is_valid()
 
-    if has_cache and cache_valid:
-        forecasts = cached["forecasts"]
-        _aio.create_task(_bg_refresh())
-    elif has_cache:
-        forecasts = cached["forecasts"]
-        _aio.create_task(_bg_refresh())
+    if has_cache:
+        # Re-aggregate forecasts with today's dates to fix stale date issue
+        raw_forecasts = cached.get("raw_forecasts", {})
+        forecasts = []
+        
+        if raw_forecasts:
+            # Rebuild forecasts from raw data using today's dates
+            for loc_id, raw in raw_forecasts.items():
+                if raw:
+                    forecasts.extend(aggregate_forecast(raw, loc_id))
+        
+        # Fallback to cached aggregated data if re-aggregation fails
+        if not forecasts:
+            forecasts = cached.get("forecasts", [])
+        
+        if cache_valid:
+            _aio.create_task(_bg_refresh())
+        else:
+            _aio.create_task(_bg_refresh())
     else:
         cache_data = await refresh_all()
         forecasts = cache_data["forecasts"]
