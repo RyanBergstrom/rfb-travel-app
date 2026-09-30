@@ -189,22 +189,33 @@ async def refresh_all(force=False):
 
     if failed_ids and not force:
         cached = read_cache()
-        if cached and "forecasts" in cached:
-            existing_ids = set(f["locationId"] for f in cached["forecasts"])
-            for f in all_forecasts:
-                if f["locationId"] not in existing_ids:
-                    cached["forecasts"].append(f)
-            cached["locationsRefreshed"] = success_count
-            cached["timestamp"] = time.time()
-            write_cache(cached)
-            return cached
+        if cached and "raw_forecasts" in cached:
+            # Re-aggregate cached raw data with today's dates
+            for loc_id, raw in cached["raw_forecasts"].items():
+                if raw and loc_id not in [f["locationId"] for f in all_forecasts]:
+                    all_forecasts.extend(aggregate_forecast(raw, loc_id))
+            cached_data = {
+                "timestamp": time.time(),
+                "forecasts": all_forecasts,
+                "raw_forecasts": cached.get("raw_forecasts", {}),
+                "locationCount": len(locations),
+                "locationsRefreshed": success_count,
+            }
+            write_cache(cached_data)
+            return cached_data
+
+    # Store both aggregated forecasts and raw data for re-aggregation
+    raw_forecasts = {}
+    for loc in locations:
+        if loc["id"] in raw_data and raw_data[loc["id"]]:
+            raw_forecasts[loc["id"]] = raw_data[loc["id"]]
 
     cache_data = {
         "timestamp": time.time(),
         "forecasts": all_forecasts,
+        "raw_forecasts": raw_forecasts,
         "locationCount": len(locations),
         "locationsRefreshed": success_count,
     }
     write_cache(cache_data)
     return cache_data
-    
