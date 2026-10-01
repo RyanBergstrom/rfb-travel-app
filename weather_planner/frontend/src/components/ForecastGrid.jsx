@@ -1,16 +1,31 @@
 import React, { useRef, useCallback, useEffect } from 'react'
 
+function getLondonDateKey(date = new Date()) {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/London',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  })
+
+  const parts = formatter.formatToParts(date)
+  const values = {}
+  parts.forEach(part => {
+    if (part.type !== 'literal') values[part.type] = part.value
+  })
+
+  return `${values.year}-${values.month}-${values.day}`
+}
+
 function formatDate(dateStr) {
-  const date = new Date(dateStr + 'T00:00:00')
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const tomorrow = new Date(today)
-  tomorrow.setDate(tomorrow.getDate() + 1)
+  const londonToday = getLondonDateKey(new Date())
+  const londonTomorrow = getLondonDateKey(new Date(Date.now() + 24 * 60 * 60 * 1000))
 
-  if (date.getTime() === today.getTime()) return 'Today'
-  if (date.getTime() === tomorrow.getTime()) return 'Tomorrow'
+  if (dateStr === londonToday) return 'Today'
+  if (dateStr === londonTomorrow) return 'Tomorrow'
 
-  return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+  const date = new Date(`${dateStr}T00:00:00`)
+  return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'Europe/London' })
 }
 
 function WeatherCell({ data }) {

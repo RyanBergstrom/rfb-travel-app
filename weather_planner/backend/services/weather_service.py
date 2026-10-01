@@ -96,7 +96,7 @@ async def fetch_raw_forecast(latitude, longitude, days=7):
     london_tz = ZoneInfo("Europe/London")
     today = datetime.now(london_tz).date()
     end_date = today + timedelta(days=days - 1)
-    
+
     params = {
         "latitude": latitude,
         "longitude": longitude,
@@ -166,11 +166,11 @@ def aggregate_forecast(raw_forecast, location_id):
         return []
     hourly = raw_forecast["hourly"]
     times = hourly.get("time", [])
-    
+
     london_tz = ZoneInfo("Europe/London")
     today_str = datetime.now(london_tz).date().isoformat()
     dates = sorted(set(t.split("T")[0] for t in times if t.split("T")[0] >= today_str))[:7]
-    
+
     results = []
     for date_str in dates:
         for period_name in ["Morning", "Afternoon", "Evening"]:
@@ -196,19 +196,29 @@ async def refresh_all(force=False):
 
     if failed_ids and not force:
         cached = read_cache()
-        if cached and "forecasts" in cached:
-            existing_ids = set(f["locationId"] for f in cached["forecasts"])
-            for f in all_forecasts:
-                if f["locationId"] not in existing_ids:
-                    cached["forecasts"].append(f)
-            cached["locationsRefreshed"] = success_count
-            cached["timestamp"] = time.time()
-            write_cache(cached)
-            return cached
+        if cached and "raw_forecasts" in cached:
+            for loc_id, raw in cached["raw_forecasts"].items():
+                if raw and loc_id not in [f["locationId"] for f in all_forecasts]:
+                    all_forecasts.extend(aggregate_forecast(raw, loc_id))
+            cached_data = {
+                "timestamp": time.time(),
+                "forecasts": all_forecasts,
+                "raw_forecasts": cached.get("raw_forecasts", {}),
+                "locationCount": len(locations),
+                "locationsRefreshed": success_count,
+            }
+            write_cache(cached_data)
+            return cached_data
+
+    raw_forecasts = {}
+    for loc in locations:
+        if loc["id"] in raw_data and raw_data[loc["id"]]:
+            raw_forecasts[loc["id"]] = raw_data[loc["id"]]
 
     cache_data = {
         "timestamp": time.time(),
         "forecasts": all_forecasts,
+        "raw_forecasts": raw_forecasts,
         "locationCount": len(locations),
         "locationsRefreshed": success_count,
     }
