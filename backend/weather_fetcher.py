@@ -34,8 +34,21 @@ CACHE_TTL = 2 * 60 * 60
 
 
 def load_locations():
-    with open(LOCATIONS_PATH, 'r') as f:
-        return [loc for loc in json.load(f) if loc.get('enabled', True)]
+    try:
+        with open(LOCATIONS_PATH, 'r') as f:
+            data = json.load(f)
+        if not isinstance(data, list):
+            print(f"ERROR: locations.json is not a list; got {type(data)}")
+            return []
+        enabled = [loc for loc in data if loc.get('enabled', True)]
+        print(f"Loaded {len(enabled)} enabled locations")
+        return enabled
+    except FileNotFoundError:
+        print(f"ERROR: locations.json not found at {LOCATIONS_PATH}")
+        return []
+    except Exception as e:
+        print(f"ERROR loading locations.json: {e}")
+        return []
 
 
 def read_cache():
@@ -92,7 +105,7 @@ def score_color(score):
     return "red"
 
 
-async def fetch_raw_forecast(latitude, longitude, days=7):
+async def fetch_raw_forecast(location_id, latitude, longitude, days=7):
     params = {
         "latitude": latitude,
         "longitude": longitude,
@@ -100,18 +113,29 @@ async def fetch_raw_forecast(latitude, longitude, days=7):
         "forecast_days": days,
         "timezone": "Europe/London",
     }
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        resp = await client.get(OPEN_METEO_URL, params=params)
-        resp.raise_for_status()
-        return resp.json()
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.get(OPEN_METEO_URL, params=params)
+            resp.raise_for_status()
+            payload = resp.json()
+            if not payload.get("hourly") or not payload["hourly"].get("time"):
+                print(f"WARNING: {location_id} returned no hourly data: {payload}")
+                return None
+            return payload
+    except Exception as e:
+        print(f"ERROR fetching forecast for {location_id} ({latitude}, {longitude}): {e}")
+        return None
 
 
 async def fetch_forecast_batch(locations, days=7):
     async def _fetch_one(loc):
-        try:
-            return loc["id"], await fetch_raw_forecast(loc["latitude"], loc["longitude"], days)
-        except Exception:
-            return loc["id"], None
+        loc_id = loc.get("id")
+        lat = loc.get("latitude")
+        lon = loc.get("longitude")
+        if lat is None or lon is None:
+            print(f"ERROR: location {loc_id} missing latitude/longitude")
+            return loc_id, None
+        return loc_id, await fetch_raw_forecast(loc_id, lat, lon, days)
 
     results = await asyncio.gather(*[_fetch_one(loc) for loc in locations])
     return dict(results)
@@ -177,6 +201,11 @@ def aggregate_forecast(raw_forecast, location_id):
 
 async def refresh_all(force=False):
     locations = load_locations()
+    if not locations:
+        print("ERROR: no locations loaded; forecast refresh aborted")
+        return {"forecasts": [], "locationCount": 0, "locationsRefreshed": 0}
+
+    print(f"Refreshing forecast for {len(locations)} locations")
     raw_data = await fetch_forecast_batch(locations)
     all_forecasts = []
     success_count = 0
@@ -188,6 +217,8 @@ async def refresh_all(force=False):
             all_forecasts.extend(aggregate_forecast(raw, loc["id"]))
         else:
             failed_ids.append(loc["id"])
+
+    print(f"Refresh complete: succeeded={success_count}, failed={len(failed_ids)}, forecast_rows={len(all_forecasts)}")
 
     if failed_ids and not force:
         cached = read_cache()
