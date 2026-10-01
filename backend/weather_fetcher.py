@@ -32,6 +32,9 @@ LOCATIONS_PATH = os.path.join(os.path.dirname(__file__), '..', 'weather_planner'
 CACHE_PATH = os.path.join(os.path.dirname(__file__), '..', 'weather_planner', 'backend', 'cache', 'forecast_cache.json')
 CACHE_TTL = 2 * 60 * 60
 
+# Semaphore to limit concurrent requests to Open-Meteo (rate limiting)
+RATE_LIMITER = asyncio.Semaphore(2)
+
 
 def load_locations():
     try:
@@ -106,25 +109,27 @@ def score_color(score):
 
 
 async def fetch_raw_forecast(location_id, latitude, longitude, days=7):
-    params = {
-        "latitude": latitude,
-        "longitude": longitude,
-        "hourly": ",".join(HOURLY_FIELDS),
-        "forecast_days": days,
-        "timezone": "Europe/London",
-    }
-    try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            resp = await client.get(OPEN_METEO_URL, params=params)
-            resp.raise_for_status()
-            payload = resp.json()
-            if not payload.get("hourly") or not payload["hourly"].get("time"):
-                print(f"WARNING: {location_id} returned no hourly data: {payload}")
-                return None
-            return payload
-    except Exception as e:
-        print(f"ERROR fetching forecast for {location_id} ({latitude}, {longitude}): {e}")
-        return None
+    async with RATE_LIMITER:
+        await asyncio.sleep(0.5)  # 0.5s delay between requests
+        params = {
+            "latitude": latitude,
+            "longitude": longitude,
+            "hourly": ",".join(HOURLY_FIELDS),
+            "forecast_days": days,
+            "timezone": "Europe/London",
+        }
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                resp = await client.get(OPEN_METEO_URL, params=params)
+                resp.raise_for_status()
+                payload = resp.json()
+                if not payload.get("hourly") or not payload["hourly"].get("time"):
+                    print(f"WARNING: {location_id} returned no hourly data")
+                    return None
+                return payload
+        except Exception as e:
+            print(f"ERROR fetching forecast for {location_id} ({latitude}, {longitude}): {e}")
+            return None
 
 
 async def fetch_forecast_batch(locations, days=7):
@@ -205,7 +210,7 @@ async def refresh_all(force=False):
         print("ERROR: no locations loaded; forecast refresh aborted")
         return {"forecasts": [], "locationCount": 0, "locationsRefreshed": 0}
 
-    print(f"Refreshing forecast for {len(locations)} locations")
+    print(f"Refreshing forecast for {len(locations)} locations (rate limited to 2 concurrent requests)")
     raw_data = await fetch_forecast_batch(locations)
     all_forecasts = []
     success_count = 0
