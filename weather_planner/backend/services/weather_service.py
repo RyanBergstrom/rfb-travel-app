@@ -2,7 +2,8 @@ import asyncio
 import json
 import os
 import time
-from datetime import date, timedelta
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import httpx
 
@@ -92,7 +93,8 @@ def score_color(score):
 
 
 async def fetch_raw_forecast(latitude, longitude, days=7):
-    today = date.today()
+    london_tz = ZoneInfo("Europe/London")
+    today = datetime.now(london_tz).date()
     end_date = today + timedelta(days=days - 1)
     
     params = {
@@ -165,7 +167,8 @@ def aggregate_forecast(raw_forecast, location_id):
     hourly = raw_forecast["hourly"]
     times = hourly.get("time", [])
     
-    today_str = date.today().isoformat()
+    london_tz = ZoneInfo("Europe/London")
+    today_str = datetime.now(london_tz).date().isoformat()
     dates = sorted(set(t.split("T")[0] for t in times if t.split("T")[0] >= today_str))[:7]
     
     results = []
