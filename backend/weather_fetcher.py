@@ -2,7 +2,7 @@ import asyncio
 import json
 import os
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from zoneinfo import ZoneInfo
 
 import httpx
@@ -93,9 +93,6 @@ def score_color(score):
 
 
 async def fetch_raw_forecast(latitude, longitude, days=7):
-    london_tz = ZoneInfo("Europe/London")
-    today = datetime.now(london_tz).date()
-    
     params = {
         "latitude": latitude,
         "longitude": longitude,
