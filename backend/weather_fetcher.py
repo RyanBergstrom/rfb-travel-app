@@ -2,7 +2,8 @@ import asyncio
 import json
 import os
 import time
-from datetime import date
+from datetime import date, datetime
+import pytz
 
 import httpx
 
@@ -161,7 +162,9 @@ def aggregate_forecast(raw_forecast, location_id):
     hourly = raw_forecast["hourly"]
     times = hourly.get("time", [])
     
-    today_str = date.today().isoformat()
+    # Get today's date in Europe/London timezone to match the API timezone
+    london_tz = pytz.timezone("Europe/London")
+    today_str = datetime.now(london_tz).date().isoformat()
     dates = sorted(set(t.split("T")[0] for t in times if t.split("T")[0] >= today_str))[:7]
     
     results = []
